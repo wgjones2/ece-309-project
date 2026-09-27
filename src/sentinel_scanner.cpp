@@ -25,7 +25,7 @@ SentinelScanner::Out SentinelScanner::feed(std::string_view chunk) {
         pending_.clear(); // Clear pending since we found the sentinel
         return result;
     }
-
+    std::size_t hold_back_size = (sentinel_.empty()) ? 0 : sentinel_.size() - 1;
     if (text_to_scan.size() <= hold_back_size) {
         // Not enough text to safely return, hold back
         pending_ = text_to_scan;
@@ -38,4 +38,13 @@ SentinelScanner::Out SentinelScanner::feed(std::string_view chunk) {
 
     return result;
 }
+
+SentinelScanner::Out SentinelScanner::flush() {
+    Out result;
+    result.safe_text = pending_;
+    result.sentinel_found = false;
+    pending_.clear();
+    return result;
+}
+
 

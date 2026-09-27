@@ -46,7 +46,7 @@ Conversation::Conversation(Conversation&& other) noexcept : data_(other.data_), 
 }
 //Move assignment operator:
 Conversation& Conversation::operator=(Conversation&& other) noexcept {
-    if (this != &other) {
+    if (this == &other) {
         return *this;
     }
     delete[] data_;
