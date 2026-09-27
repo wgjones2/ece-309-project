@@ -9,21 +9,23 @@
 
 #pragma once // make sure it is only included once
 #include <string>
-#include <cstdef>
+#include <cstddef>
 #include <string_view>
 
+// given from spec:
 class SentinelScanner {
     public:
         // takes in the string to look for the end marker
-        SentinelScanner(std::string sentinel);
+        explicit SentinelScanner(std::string sentinel);
 
         //define what feed and flush will return:
         struct Out {
-            std::string normal_text;
+            std::string safe_text;
             bool sentinel_found;
         };
         Out feed(std::string_view chunk);
         Out flush();
     private:
         std::string sentinel_;
-}
+        std::string pending_;
+};
