@@ -26,7 +26,7 @@ class Conversation {
         std::size_t capacity() const noexcept; // get the capacity of the conversation
         
         //Bound check: will throw std::out_of_range if index is out
-        const Message& at(std::size_t index) const; //check bounds.
+        const Message& at(std::size_t i) const; //check bounds.
         
         // get pointers for first and last message in the conversation, for iteration
         const Message* begin() const noexcept; // get a pointer to the first message
