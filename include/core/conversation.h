@@ -12,6 +12,9 @@
 class Conversation {
     public:
         //note: VScodes autocomplete is doing a lot of this unintentionally.
+        // will double check.
+
+        //special member functions: rule of five used here
         Conversation(); // default constructor
         ~Conversation(); // destructor
         Conversation(const Conversation& other); // copy constructor
@@ -19,15 +22,20 @@ class Conversation {
         Conversation(Conversation&& other) noexcept; // move constructor
         Conversation& operator=(Conversation&& other) noexcept; // move assignment operator
 
-        void append(Message message); // append a message to the conversation
+        void append(Message message); // append a message to the conversation list
 
+        // get the numver of messages and the capacity of the conversation
         std::size_t size() const noexcept; //get the number of messages in the conversation
         std::size_t capacity() const noexcept; // get the capacity of the conversation
+        
+        //Bound check: will throw std::out_of_range if index is out
         const Message& at(std::size_t index) const; //check bounds.
+        
+        // get pointers for first and last message in the conversation, for iteration
         const Message* begin() const noexcept; // get a pointer to the first message
         const Message* end() const noexcept; // get a pointer to one past the last message
     private:
-        Message* data_; // pointer to the array of messages
-        std::size_t size_; //number of messages in the conversation
-        std::size_t capacity_; //capacity of the conversation
+        Message* data_ = nullptr; // pointer to the array of messages
+        std::size_t size_ = 0; //number of messages in the conversation
+        std::size_t capacity_ = 0; //capacity of the conversation
 };
