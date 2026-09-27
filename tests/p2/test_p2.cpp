@@ -1,4 +1,5 @@
-// test code for the project
+// tests/p2/test_p2.cpp
+// test code for the project 2
 
 #undef NDEBUG
 #include <cassert>      // assert()
@@ -68,9 +69,54 @@ void save_conversation_to_file(const Conversation& conv, const std::string& file
 
 // need to pretend to be the keyboard input
 // will make a class to simulate keyboard input
+class ConsoleInputSimulator : public InputSource {
+    public:
+        //constructor:
+        ConsoleInputSimulator() {
+            // start with zeroed values
+            count = 0;
+            next = 0;
+            eof_ = false;
+        }
+        // add a line to the simulated input
+        void add_line(const std::string& line) {
+            assert(count < 10);
+            lines_[count] = line;
+            ++count;
+        }
+
+        // get the next line of input
+        std::string read_line() override {
+            if (next >= count) {
+                eof_ = true;
+                return "";
+            }
+            std::string line = lines_[next];
+            ++next;
+            return line;
+        }
+        // check if end of input has been reached
+        bool is_eof() const override {
+            return eof_;
+        }
+    
+    // initialization of private members
+    private:
+        int count;
+        int next;
+        bool eof_;
+        std::string lines_[10];
+};
 
 // also need a way to get the text the harness would
 // output to the console
+class ConsoleOutputSimulator : public OutputSink {
+    public:
+        void write(std::string_view text) override {
+            all_text += text;
+        }
+        std::string all_text;
+};
 
 //Test 1: empty conversation bounds
 void test_1() {}
