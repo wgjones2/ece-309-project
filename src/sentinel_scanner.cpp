@@ -48,3 +48,9 @@ SentinelScanner::Out SentinelScanner::flush() {
     pending_.clear();
     return result;
 }
+
+// Returns how many characters are currently held back in pending_.
+// Lets the tests check that pending_ never holds more than sentinel_.size() - 1 characters.
+std::size_t SentinelScanner::pending_size() const noexcept {
+    return pending_.size();
+}

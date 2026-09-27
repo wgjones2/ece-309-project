@@ -21,6 +21,13 @@ Conversation::Conversation(const Conversation& other) : size_(other.size_), capa
         data_ = nullptr;
     }
 }
+
+// Old version
+// the new one fixes a potential memory leak bug
+// keeps old valid contentents if 
+// if anything throws
+
+/*
 //Copy assignment operator with deep copy:
 Conversation& Conversation::operator=(const Conversation& other) {
     if (this != &other) {
@@ -38,6 +45,26 @@ Conversation& Conversation::operator=(const Conversation& other) {
     }
     return *this;
 }
+*/
+
+// Copy assingment with deep copy:
+Conversation& Conversation::operator=(const Conversation& other) {
+    if (this != &other) {
+        Message* new_data = nullptr;
+        if (other.capacity_ > 0) {
+            new_data = new Message[other.capacity_];
+            for (std::size_t i = 0; i < other.size_; ++i) {
+                new_data[i] = other.data_[i];
+            }
+        }
+        delete[] data_;
+        data_ = new_data;
+        size_ = other.size_;
+        capacity_ = other.capacity_;
+    }
+    return *this;
+}
+
 //Move constructor:
 Conversation::Conversation(Conversation&& other) noexcept : data_(other.data_), size_(other.size_), capacity_(other.capacity_) {
     other.data_ = nullptr;
