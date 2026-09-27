@@ -31,3 +31,8 @@ namespace {
         return false;
     }
 }
+
+//test for compile
+int main() {
+    return 0;
+}

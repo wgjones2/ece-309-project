@@ -17,7 +17,7 @@ class Message {
     public:
         Message(): role_(Role::System), content_("") {} // default constructor
         Message(Role role, std::string content): role_(role), content_(content) {} // constructor with role and content
-        Role role() const { return role_; } // get the role of the message sender
+        Role role() const noexcept { return role_; } // get the role of the message sender
         const std::string& content() const noexcept { return content_; } // get the content of the message
     private:
         Role role_; // the role of the message sender
