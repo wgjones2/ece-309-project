@@ -11,9 +11,6 @@
 
 class Conversation {
     public:
-        //note: VScodes autocomplete is doing a lot of this unintentionally.
-        // will double check.
-
         //special member functions: rule of five used here
         Conversation(); // default constructor
         ~Conversation(); // destructor
