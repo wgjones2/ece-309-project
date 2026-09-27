@@ -10,4 +10,20 @@
 #pragma once // make sure it is only included once
 #include <string>
 #include <cstdef>
+#include <string_view>
 
+class SentinelScanner {
+    public:
+        // takes in the string to look for the end marker
+        SentinelScanner(std::string sentinel);
+
+        //define what feed and flush will return:
+        struct Out {
+            std::string normal_text;
+            bool sentinel_found;
+        };
+        Out feed(std::string_view chunk);
+        Out flush();
+    private:
+        std::string sentinel_;
+}
