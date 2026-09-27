@@ -119,10 +119,37 @@ class ConsoleOutputSimulator : public OutputSink {
 };
 
 //Test 1: empty conversation bounds
-void test_1() {}
+void test_1() {
+    Conversation conv;
+    assert(conv.size() == 0);
+    assert(conv.begin() == conv.end());
 
-//Test2: system message ordering
-void test_2() {}
+    assert(at_throws_out_of_range(conv, 0));
+    assert(at_throws_out_of_range(conv, 5));
+    // helper will return so not needed here
+}
+
+//Test 2: system message ordering
+void test_2() {
+    Conversation conv;
+    conv.append(Message(Role::System, "System message"));
+
+    for (int i = 0; i < 20; ++i) {
+        if (i % 2 == 0) {
+            conv.append(Message(Role::User, "User message"));
+        } else {
+            conv.append(Message(Role::System, "System message"));
+        }
+    }
+    assert(conv.size() == 21);
+
+    assert(conv.at(0).role() == Role::System);
+    assert(conv.at(0).content() == "System message");
+
+    for (std::size_t i = 1; i < conv.size(); ++i) {
+        assert(conv.at(i).role() != Role::System);
+    }
+}
 
 //Test 3: rule of five (copy)
 void test_3() {}
