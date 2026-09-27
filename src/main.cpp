@@ -3,8 +3,8 @@
 // Conversation and SentinelScanner (see spec §2 "Note on command-line
 // arguments" and §3).
 
-#include "harness/harness.h"
-#include "model/scripted_client.h"
+#include "../include/harness/harness.h"
+#include "../include/model/scripted_client.h"
 #include <iostream>
 #include <fstream>
 #include <string>
