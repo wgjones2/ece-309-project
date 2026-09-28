@@ -32,4 +32,4 @@ For the sake of induction, assume P has at most h characters before feeding a ne
 In hindsight, I would change how append() grows the array. Right now, when the array is full, it copies every message into the new array and then deletes the old one. That means the text of every message gets copied even though the old array is about to be deleted. I would use std::move to move each message instead. Moving only takes over the string's pointer, so no text is copied. The growth would still be amortized O(1), but each resize would do less work.
 
 ## Project feedback
-The test program was the hardest part of this project. Ideally, it would have try-catch blocks and more advanced testing that we have not covered yet, so it would fit better later on.
+The test program was the hardest part of this project. It needed try-catch blocks and more advanced testing that we have not covered yet, so it would fit better later on.

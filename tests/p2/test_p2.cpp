@@ -503,7 +503,7 @@ int main() {
     test_10();
     std::cout << "PASS 10: Harness (turn limit)" << std::endl;
     test_11();
-    std::cout << "PASS 11: Harness (sentinel hault)" << std::endl;
+    std::cout << "PASS 11: Harness (sentinel halt)" << std::endl;
     test_12();
     std::cout << "PASS 12: Transcript round-trip" << std::endl;
     test_13();
