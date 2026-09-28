@@ -249,7 +249,7 @@ void test_5() {
         assert(conv.size() == i + 1);
         assert(conv.capacity() == expected_capacity);
     }
-    assert(conv.capacity() == 128); // 128 after 100 appends - closed smaller power of 2
+    assert(conv.capacity() == 128); // 128 after 100 appends - smallest power of 2 >= 100
 
     for (std::size_t i= 0; i< conv.size(); ++i) {
         assert(conv.at(i).content() == std::to_string(i));
@@ -257,7 +257,7 @@ void test_5() {
     assert(at_throws_out_of_range(conv, 100));
 }
 
-// Test6: scanner (clean edit)
+// Test6: scanner (clean text)
 void test_6() {
     SentinelScanner scanner(Sentinel_Test_Value);
     std::string input = "some test input without a stop marker";
@@ -307,7 +307,7 @@ void test_8() {
 void test_9() {
     SentinelScanner scanner(Sentinel_Test_Value);
     std::size_t max_allowed = Sentinel_Test_Value.size() - 1;
-    std::string piece = "<end_";
+    std::string piece = "<|end_";
     std::size_t total_emitted = 0;
     for (std::size_t i = 0; i < STREAM_BYTES; ++i) {
         char c = piece[i % piece.size()]; // cycle through the piece
@@ -357,7 +357,7 @@ void test_10() {
     std::remove(script.c_str());  // delete the temporary file
 }
 
-//Test 11: harness sentinel hault
+//Test 11: harness sentinel halt
 void test_11() {
     std::string script_file = "test_sentinel.script";
     write_text_file(script_file,
