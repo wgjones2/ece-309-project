@@ -37,6 +37,7 @@ bool at_throws_out_of_range(const Conversation& conv, std::size_t i) {
 
 //helper: function to write text to a file
 void write_text_file(const std::string& filename, const std::string& text) {
+    //open the file for writing, makes it if it doesnt exist
     std::ofstream out(filename);
     out << text;
     out.close();
@@ -61,6 +62,7 @@ std::string role_to_transcript_word(Role role) {
 void save_conversation_to_file(const Conversation& conv, const std::string& filename) {
     std::ofstream out(filename);
     for (std::size_t i = 0; i < conv.size(); ++i) {
+        // put a --- divider between messages but not before the first one
         if (i>0) {
             out << "---\n";
         }
@@ -83,6 +85,7 @@ class ConsoleInputSimulator : public InputSource {
         }
         // add a line to the simulated input
         void add_line(const std::string& line) {
+            //only room for 10 lines, crash if we go over
             assert(count < 10);
             lines_[count] = line;
             ++count;
@@ -90,6 +93,7 @@ class ConsoleInputSimulator : public InputSource {
 
         // get the next line of input
         std::string read_line() override {
+            // no lines left so act like the user hit ctrl-d
             if (next >= count) {
                 eof_ = true;
                 return "";
@@ -116,6 +120,7 @@ class ConsoleInputSimulator : public InputSource {
 class ConsoleOutputSimulator : public OutputSink {
     public:
         void write(std::string_view text) override {
+            //just keep tacking the text onto one big string
             all_text += text;
         }
         std::string all_text;
@@ -125,6 +130,7 @@ class ConsoleOutputSimulator : public OutputSink {
 void test_1() {
     Conversation conv;
     assert(conv.size() == 0);
+    // begin and end are the same spot when theres nothing in it
     assert(conv.begin() == conv.end());
     assert(at_throws_out_of_range(conv, 0));
     assert(at_throws_out_of_range(conv, 5));
@@ -136,6 +142,7 @@ void test_2() {
     conv.append(Message(Role::System, "System message"));
 
     for (int i = 0; i < 20; ++i) {
+        //even i is a user msg, odd i is assistant so they take turns
         if (i % 2 == 0) {
             conv.append(Message(Role::User, "User message"));
         } else {
@@ -160,6 +167,7 @@ void test_2() {
             assert(msg.role() != Role::System);
         }
     }
+    // make a copy and a moved version, system msg should still be first in both
     Conversation copy(conv);
     assert(copy.at(0).role() == Role::System);
     Conversation moved(std::move(copy));
@@ -175,6 +183,7 @@ void test_3() {
 
     // copy constructor:
     Conversation copy (original);
+    //different addresses means the copy got its own memory
     assert(copy.begin() != original.begin());
     assert(copy.size() == original.size());
     for (std::size_t i = 0; i < copy.size(); ++i) {
@@ -182,6 +191,7 @@ void test_3() {
         assert(copy.at(i).content() == original.at(i).content());
     }
 
+    // adding to the copy shouldnt change the original
     copy.append(Message(Role::User, "hello copy side"));
     assert(copy.size() == 3);
     assert(original.size() == 2);
@@ -218,6 +228,7 @@ void test_4() {
     // move assignment operator:
     Conversation target;
     target.append(Message(Role::User, "hello target side"));
+    //std::move hands over the memory instead of copying it
     target = std::move(moved);
     assert(target.begin() == old_array);
     assert(target.size() == 2);
@@ -225,6 +236,7 @@ void test_4() {
     assert(moved.capacity() == 0);
     assert(moved.begin() == nullptr);
 
+    // original should still work after being moved from
     original.append(Message(Role::User, "hello reused"));
     assert(original.size() == 1);
     assert(original.at(0).content() == "hello reused");
@@ -239,6 +251,7 @@ void test_5() {
     
     for (std::size_t i = 0; i < 100; ++i) {
         conv.append(Message(Role::User, std::to_string(i)));
+        //ran out of room so capacity should double (0 goes to 1)
         if (conv.size() > expected_capacity) {
             if (expected_capacity == 0) {
                 expected_capacity = 1;
@@ -261,6 +274,7 @@ void test_5() {
 void test_6() {
     SentinelScanner scanner(Sentinel_Test_Value);
     std::string input = "some test input without a stop marker";
+    // feed gives back text thats safe to print, flush gives whatever was held back
     SentinelScanner::Out out1= scanner.feed(input);
     SentinelScanner::Out out2 = scanner.flush();
 
@@ -275,6 +289,7 @@ void test_6() {
 void test_7() {
     const std::string sentinel = "<|end_conversation|>";
     const std::string text = "Goodbye." + sentinel;
+    //try cutting the text at every possible spot
     for (std::size_t split = 0; split <= text.size(); ++split) {
         SentinelScanner scanner(sentinel);
         SentinelScanner::Out out1 = scanner.feed(text.substr(0, split));
@@ -290,6 +305,7 @@ void test_8() {
     std::string text = "A <|end_nothing|> B <|end_conversation| C <|end_";
     SentinelScanner scanner(Sentinel_Test_Value);
     std::string safe_text = "";
+    // feed it one character at a time
     for (std::size_t i = 0; i < text.size(); ++i) {
         SentinelScanner::Out out = scanner.feed(text.substr(i, 1));
         assert(out.sentinel_found == false);
@@ -313,6 +329,7 @@ void test_9() {
         char c = piece[i % piece.size()]; // cycle through the piece
         SentinelScanner::Out out = scanner.feed(std::string(1, c));
         assert(out.sentinel_found == false);
+        //scanner should never hang on to more than sentinel length - 1 chars
         assert(scanner.pending_size() <= max_allowed);
         total_emitted += out.safe_text.size();
     }
@@ -341,6 +358,7 @@ void test_10() {
 
     HarnessConfig config;
     config.max_turns= 2;  // Example turn limit for the test
+    // unique_ptr owns the model and deletes it for us when done
     std::unique_ptr<ModelClient> model = std::make_unique<ScriptedModelClient>(script);
     Harness harness(std::move(model), config);
     ConsoleInputSimulator input;
@@ -350,8 +368,10 @@ void test_10() {
     input.add_line("four");
     ConsoleOutputSimulator output;
 
+    //runs the whole chat loop until something makes it stop
     StopReason result = harness.run(input, output);
     assert(result.kind == StopReason::Kind::TurnLimit);
+    // 2 user msgs + 2 replies = 4
     assert(harness.conversation().size() == 4);
     assert(harness.conversation().at(3).content() == "Reply two.");
     std::remove(script.c_str());  // delete the temporary file
@@ -385,6 +405,7 @@ void test_11() {
     assert(harness.conversation().size() == 4);
     assert(harness.conversation().at(3).content() == "Goodbye." + Sentinel_Test_Value);
     assert(output.all_text.find("Goodbye.") != std::string::npos);
+    //npos means find didnt find it anywhere
     assert(output.all_text.find(Sentinel_Test_Value) == std::string::npos);
     assert(output.all_text.find("never be used") == std::string::npos);
     std::remove(script_file.c_str());
@@ -404,6 +425,7 @@ void test_12() {
     save_conversation_to_file(original, transcript_file);
 
     // Step 2: load it with ReplayModelClient.
+    // -> is how you call a function through a pointer
     std::unique_ptr<ReplayModelClient> replay = std::make_unique<ReplayModelClient>(transcript_file);
     assert(replay->system_message() == "Be concise.");
 
@@ -448,6 +470,7 @@ void test_13() {
     ConsoleOutputSimulator output;
     StopReason result = harness.run(input, output);
     assert(result.kind == StopReason::Kind::UserExit);
+    //one user msg plus one reply
     assert(harness.conversation().size() == 2);
     assert(harness.conversation().at(1).content() == "Reply one.");
     std::remove(script_file.c_str());
