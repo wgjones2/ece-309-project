@@ -20,6 +20,8 @@
 #include "model/scripted_client.h"
 #include "model/replay_client.h"
  
+#define COPIES_NUMBER 100000
+
 const std::string kSentinel = "<|end_conversation|>";
 
 //helper: function to check if out of range
@@ -152,37 +154,279 @@ void test_2() {
 }
 
 //Test 3: rule of five (copy)
-void test_3() {}
+void test_3() {
+    Conversation original;
+    original.append(Message(Role::User, "hello1"));
+    original.append(Message(Role::Assistant, "hello2"));
+
+    // copy constructor:
+    Conversation copy (original);
+    assert(copy.begin() != original.begin());
+    assert(copy.size() == original.size());
+    for (std::size_t i = 0; i < copy.size(); ++i) {
+        assert(copy.at(i).role() == original.at(i).role());
+        assert(copy.at(i).content() == original.at(i).content());
+    }
+
+    copy.append(Message(Role::User, "hello copy side"));
+    assert(copy.size() == 3);
+    assert(original.size() == 2);
+
+    //copy assignment operator:
+    Conversation assigned;
+    assigned.append(Message(Role::User, "hello assigned side"));
+    assigned = original;
+    assert(assigned.begin() != original.begin());
+    assert(assigned.size() == 2);
+    assert(assigned.at(0).content() == "hello1");
+    assert(assigned.at(1).content() == "hello2");
+}
 
 //Test 4: rule of five (move)
-void test_4() {}
+void test_4() {
+    Conversation original;
+    original.append(Message(Role::User, "hello1"));
+    original.append(Message(Role::Assistant, "hello2"));
+
+    // Remember where original's array lives in memory.
+    const Message* old_array = original.begin();
+
+    // move constructor:
+    Conversation moved (std::move(original));
+    assert(moved.begin() == old_array);
+    assert(moved.size() == 2);
+    assert(moved.at(0).content() == "hello1");
+    // original should be in a valid but empty state
+    assert(original.size() == 0);
+    assert(original.capacity() == 0);
+    assert(original.begin() == nullptr);
+
+    // move assignment operator:
+    Conversation target;
+    target.append(Message(Role::User, "hello target side"));
+    target = std::move(moved);
+    assert(target.begin() == old_array);
+    assert(target.size() == 2);
+    assert(moved.size() == 0);
+    assert(moved.capacity() == 0);
+    assert(moved.begin() == nullptr);
+
+    original.append(Message(Role::User, "hello reused"));
+    assert(original.size() == 1);
+    assert(original.at(0).content() == "hello reused");
+}
 
 //Test 5: growth behavior
-void test_5() {}
+void test_5() {
+    Conversation conv;
+    assert(conv.capacity() == 0);
+    
+    std::size_t expected_capacity = 0;
+    
+    for (std::size_t i = 0; i < 10; ++i) {
+        conv.append(Message(Role::User, std::to_string(i)));
+        if (conv.size() > expected_capacity) {
+            if (expected_capacity == 0) {
+                expected_capacity = 1;
+            } else {
+                expected_capacity *= 2;
+            }
+        }
+        assert(conv.size() == i + 1);
+        assert(conv.capacity() == expected_capacity);
+    }
+    assert(conv.capacity() == 128); // 128 after 100 appends - closed smaller power of 2
+
+    for (std::size_t i= 0; i< conv.size(); ++i) {
+        assert(conv.at(i).content() == std::to_string(i));
+    }
+    assert(at_throws_out_of_range(conv, 100));
+}
 
 // Test6: scanner (clean edit)
-void test_6() {}
+void test_6() {
+    SentinelScanner scanner(kSentinel);
+    std::string input = "some test input without a stop marker";
+    SentinelScanner::Out out1= scanner.feed(input);
+    SentinelScanner::Out out2 = scanner.flush();
+
+    assert(out1.sentinel_found == false);
+    assert(out2.sentinel_found == false);
+
+    assert(out1.safe_text + out2.safe_text == input);
+}
 
 //Test 7: scanner (split sentinel)
-void test_7() {}
+// copied from spec
+void test_7() {
+    const std::string sentinel = "<|end_conversation|>";
+    const std::string text = "Goodbye." + sentinel;
+    for (std::size_t split = 0; split <= text.size(); ++split) {
+        SentinelScanner scanner(sentinel);
+        SentinelScanner::Out out1 = scanner.feed(text.substr(0, split));
+        SentinelScanner::Out out2 = scanner.feed(text.substr(split));
+        assert((out1.sentinel_found || out2.sentinel_found) &&
+               "sentinel must be caught regardless of split point");
+        assert(out1.safe_text + out2.safe_text == "Goodbye.");
+    }
+}
 
 // Test 8: scanner (false alarms (partial matches))
-void test_8() {}
+void test_8() {
+    std::string text = "A <|end_nothing|> B <|end_conversation| C <|end_";
+    SentinelScanner scanner(kSentinel);
+    std::string safe_text = "";
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        SentinelScanner::Out out = scanner.feed(text.substr(i, 1));
+        assert(out.sentinel_found == false);
+        safe_text += out.safe_text;
+    }
+
+    SentinelScanner::Out out = scanner.flush();
+    assert(out.sentinel_found == false);
+    safe_text += out.safe_text;
+
+    assert(safe_text == text);
+}
 
 //Test 9: scanner (bounded memory)
-void test_9() {}
+void test_9() {
+    SentinelScanner scanner(kSentinel);
+    std::size_t max_allowed = kSentinel.size() - 1;
+    std::string piece = "<end_";
+    for (int copy=0; copy < COPIES_NUMBER; ++copy) {
+        SentinelScanner::Out out = scanner.feed(piece.substr(copy,1));
+        assert(out.sentinel_found == false);
+        assert(scanner.pending_size() <= max_allowed);
+    }
+}
 
 //Test 10: harness turn limit
-void test_10() {}
+void test_10() {
+    std::string script = "test_turn_limit.script";
+
+    write_text_file(script, 
+        "role: assistant\n"
+        "Reply one.\n"
+        "---\n"
+        "role: assistant\n"
+        "Reply two.\n"
+        "---\n"
+        "role: assistant\n"
+        "Reply three.\n");
+
+    HarnessConfig config;
+    config.max_turns= 2;  // Example turn limit for the test
+    std::unique_ptr<ModelClient> model = std::make_unique<ScriptedModelClient>(script);
+    Harness harness(std::move(model), config);
+    ConsoleInputSimulator input;
+    input.add_line("one");
+    input.add_line("two");
+    input.add_line("three");
+    input.add_line("four");
+    ConsoleOutputSimulator output;
+
+    StopReason result = harness.run(input, output);
+    assert(result.kind == StopReason::Kind::TurnLimit);
+    assert(harness.conversation().size() == 4);
+    assert(harness.conversation().at(3).content() == "Reply two.");
+    std::remove(script.c_str());  // delete the temporary file
+}
 
 //Test 11: harness sentinel hault
-void test_11() {}
+void test_11() {
+    std::string script_file = "test_sentinel.script";
+    write_text_file(script_file,
+        "role: assistant\n"
+        "First reply.\n"
+        "---\n"
+        "chunk: 3\n"
+        "role: assistant\n"
+        "Goodbye.<|end_conversation|>\n"
+        "---\n"
+        "role: assistant\n"
+        "This reply should never be used.\n");
+
+    HarnessConfig config;//default max_turns = 20
+    std::unique_ptr<ModelClient> model = std::make_unique<ScriptedModelClient>(script_file);
+    Harness harness(std::move(model), config);
+    ConsoleInputSimulator input;
+    input.add_line("hello");
+    input.add_line("bye");
+    input.add_line("are you still there?");
+    ConsoleOutputSimulator output;
+    StopReason result = harness.run(input, output);
+    assert(result.kind == StopReason::Kind::Sentinel);
+    assert(result.detail == "stop sentinel after 2 turns");
+    assert(harness.conversation().size() == 4);
+    assert(harness.conversation().at(3).content() == "Goodbye." + kSentinel);
+    assert(output.all_text.find("Goodbye.") != std::string::npos);
+    assert(output.all_text.find(kSentinel) == std::string::npos);
+    assert(output.all_text.find("never be used") == std::string::npos);
+    std::remove(script_file.c_str());
+}
 
 //test 12: transcirp round trip
-void test_12() {}
+void test_12() {
+    std::string transcript_file = "test_round_trip.txt";
+
+    // Step 1: build and save the mock conversation
+    Conversation original;
+    original.append(Message(Role::System, "Be concise."));
+    original.append(Message(Role::User, "hello"));
+    original.append(Message(Role::Assistant, "Hi! What can I do for you today?"));
+    original.append(Message(Role::User, "nothing, bye"));
+    original.append(Message(Role::Assistant, "Goodbye." + kSentinel));
+    save_conversation_to_file(original, transcript_file);
+
+    // Step 2: load it with ReplayModelClient.
+    std::unique_ptr<ReplayModelClient> replay = std::make_unique<ReplayModelClient>(transcript_file);
+    assert(replay->system_message() == "Be concise.");
+
+    // Step 3: run the Harness. The system message goes in the config so
+    HarnessConfig config;
+    config.system_message = replay->system_message();
+    Harness harness(std::move(replay), config);
+
+    // The fake user types the same lines as the original conversation.
+    ConsoleInputSimulator input;
+    input.add_line("hello");
+    input.add_line("nothing, bye");
+    ConsoleOutputSimulator output;
+    StopReason result = harness.run(input, output);
+    assert(result.kind == StopReason::Kind::Sentinel);
+
+    // Step 4: compare every message, role and text.
+    const Conversation& replayed = harness.conversation();
+    assert(replayed.size() == original.size());
+    for (std::size_t i = 0; i < original.size(); i++) {
+        assert(replayed.at(i).role() == original.at(i).role());
+        assert(replayed.at(i).content() == original.at(i).content());
+    }
+    std::remove(transcript_file.c_str());
+}
 
 //test 13: (added based on rubric) harness (EOF and Clean Shutdown)
-void test_13() {}
+void test_13() {
+    	std::string script_file = "test_eof.script";
+		write_text_file(script_file,
+			"role: assistant\n"
+			"Reply one.\n"
+			"---\n"
+			"role: assistant\n"
+			"Reply two.\n");
+
+		HarnessConfig config; //default max_turns = 20
+		std::unique_ptr<ModelClient> model = std::make_unique<ScriptedModelClient>(script_file);
+		Harness harness(std::move(model), config);
+        ConsoleInputSimulator input;
+		input.add_line("hello");
+        ConsoleOutputSimulator output;
+		StopReason result = harness.run(input, output);
+		assert(result.kind == StopReason::Kind::UserExit);
+		assert(harness.conversation().size() == 2);
+		std::remove(script_file.c_str());
+}
 
 //test for compile
 int main() {
