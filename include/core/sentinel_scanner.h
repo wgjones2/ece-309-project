@@ -12,7 +12,6 @@
 #include <cstddef>
 #include <string_view>
 
-// given from spec:
 class SentinelScanner {
     public:
         // takes in the string to look for the end marker
@@ -23,8 +22,12 @@ class SentinelScanner {
             std::string safe_text;
             bool sentinel_found;
         };
+        // Feed the next chunk.
         Out feed(std::string_view chunk);
+        // Flush any remaining text
         Out flush();
+        //no required by spec: how many characters are held
+        // in pending_ right now. Used by the tests to check the bound.
         std::size_t pending_size() const noexcept;
     private:
         std::string sentinel_;

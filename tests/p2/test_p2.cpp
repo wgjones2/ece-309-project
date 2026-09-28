@@ -20,7 +20,8 @@
 #include "model/scripted_client.h"
 #include "model/replay_client.h"
  
-#define COPIES_NUMBER 100000
+//changed for "4MB stream one byte at a time" stress test
+#define STREAM_BYTES (4 * 1024 * 1024)
 
 const std::string Sentinel_Test_Value = "<|end_conversation|>";
 
@@ -125,10 +126,8 @@ void test_1() {
     Conversation conv;
     assert(conv.size() == 0);
     assert(conv.begin() == conv.end());
-
     assert(at_throws_out_of_range(conv, 0));
     assert(at_throws_out_of_range(conv, 5));
-    // helper will return so not needed here
 }
 
 //Test 2: system message ordering
@@ -140,17 +139,32 @@ void test_2() {
         if (i % 2 == 0) {
             conv.append(Message(Role::User, "User message"));
         } else {
-            conv.append(Message(Role::System, "System message"));
+            conv.append(Message(Role::Assistant, "Assistant message"));
         }
+        // still pinned at the front after every append / regrow
+        assert(conv.at(0).role() == Role::System);
+        assert(conv.at(0).content() == "System message");
     }
     assert(conv.size() == 21);
 
-    assert(conv.at(0).role() == Role::System);
-    assert(conv.at(0).content() == "System message");
-
+    // only one system message
     for (std::size_t i = 1; i < conv.size(); ++i) {
         assert(conv.at(i).role() != Role::System);
     }
+    bool first = true;
+    for (const Message& msg : conv) {
+        if (first) {
+            assert(msg.role() == Role::System);
+            first = false;
+        } else {
+            assert(msg.role() != Role::System);
+        }
+    }
+    Conversation copy(conv);
+    assert(copy.at(0).role() == Role::System);
+    Conversation moved(std::move(copy));
+    assert(moved.at(0).role() == Role::System);
+    assert(moved.at(0).content() == "System message");
 }
 
 //Test 3: rule of five (copy)
@@ -223,7 +237,7 @@ void test_5() {
     
     std::size_t expected_capacity = 0;
     
-    for (std::size_t i = 0; i < 10; ++i) {
+    for (std::size_t i = 0; i < 100; ++i) {
         conv.append(Message(Role::User, std::to_string(i)));
         if (conv.size() > expected_capacity) {
             if (expected_capacity == 0) {
@@ -294,11 +308,21 @@ void test_9() {
     SentinelScanner scanner(Sentinel_Test_Value);
     std::size_t max_allowed = Sentinel_Test_Value.size() - 1;
     std::string piece = "<end_";
-    for (int copy=0; copy < COPIES_NUMBER; ++copy) {
-        SentinelScanner::Out out = scanner.feed(piece.substr(copy,1));
+    std::size_t total_emitted = 0;
+    for (std::size_t i = 0; i < STREAM_BYTES; ++i) {
+        char c = piece[i % piece.size()]; // cycle through the piece
+        SentinelScanner::Out out = scanner.feed(std::string(1, c));
         assert(out.sentinel_found == false);
         assert(scanner.pending_size() <= max_allowed);
+        total_emitted += out.safe_text.size();
     }
+    assert(total_emitted + scanner.pending_size() == STREAM_BYTES);
+
+    //flush
+    SentinelScanner::Out out = scanner.flush();
+    assert(out.sentinel_found == false);
+    assert(scanner.pending_size() == 0);
+    assert(total_emitted + out.safe_text.size() == STREAM_BYTES);
 }
 
 //Test 10: harness turn limit
@@ -366,7 +390,7 @@ void test_11() {
     std::remove(script_file.c_str());
 }
 
-//test 12: transcirp round trip
+//test 12: transcript round trip
 void test_12() {
     std::string transcript_file = "test_round_trip.txt";
 
@@ -408,24 +432,25 @@ void test_12() {
 
 //test 13: (added based on rubric) harness (EOF and Clean Shutdown)
 void test_13() {
-    	std::string script_file = "test_eof.script";
-		write_text_file(script_file,
-			"role: assistant\n"
-			"Reply one.\n"
-			"---\n"
-			"role: assistant\n"
-			"Reply two.\n");
+    std::string script_file = "test_eof.script";
+    write_text_file(script_file,
+        "role: assistant\n"
+        "Reply one.\n"
+        "---\n"
+        "role: assistant\n"
+        "Reply two.\n");
 
-		HarnessConfig config; //default max_turns = 20
-		std::unique_ptr<ModelClient> model = std::make_unique<ScriptedModelClient>(script_file);
-		Harness harness(std::move(model), config);
-        ConsoleInputSimulator input;
-		input.add_line("hello");
-        ConsoleOutputSimulator output;
-		StopReason result = harness.run(input, output);
-		assert(result.kind == StopReason::Kind::UserExit);
-		assert(harness.conversation().size() == 2);
-		std::remove(script_file.c_str());
+    HarnessConfig config; //default max_turns = 20
+    std::unique_ptr<ModelClient> model = std::make_unique<ScriptedModelClient>(script_file);
+    Harness harness(std::move(model), config);
+    ConsoleInputSimulator input;
+    input.add_line("hello"); // one line, then the simulator reports EOF (Ctrl-D)
+    ConsoleOutputSimulator output;
+    StopReason result = harness.run(input, output);
+    assert(result.kind == StopReason::Kind::UserExit);
+    assert(harness.conversation().size() == 2);
+    assert(harness.conversation().at(1).content() == "Reply one.");
+    std::remove(script_file.c_str());
 }
 
 //sorry if this was not the intended layout
