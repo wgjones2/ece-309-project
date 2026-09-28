@@ -22,7 +22,7 @@
  
 #define COPIES_NUMBER 100000
 
-const std::string kSentinel = "<|end_conversation|>";
+const std::string Sentinel_Test_Value = "<|end_conversation|>";
 
 //helper: function to check if out of range
 bool at_throws_out_of_range(const Conversation& conv, std::size_t i) {
@@ -245,7 +245,7 @@ void test_5() {
 
 // Test6: scanner (clean edit)
 void test_6() {
-    SentinelScanner scanner(kSentinel);
+    SentinelScanner scanner(Sentinel_Test_Value);
     std::string input = "some test input without a stop marker";
     SentinelScanner::Out out1= scanner.feed(input);
     SentinelScanner::Out out2 = scanner.flush();
@@ -274,7 +274,7 @@ void test_7() {
 // Test 8: scanner (false alarms (partial matches))
 void test_8() {
     std::string text = "A <|end_nothing|> B <|end_conversation| C <|end_";
-    SentinelScanner scanner(kSentinel);
+    SentinelScanner scanner(Sentinel_Test_Value);
     std::string safe_text = "";
     for (std::size_t i = 0; i < text.size(); ++i) {
         SentinelScanner::Out out = scanner.feed(text.substr(i, 1));
@@ -291,8 +291,8 @@ void test_8() {
 
 //Test 9: scanner (bounded memory)
 void test_9() {
-    SentinelScanner scanner(kSentinel);
-    std::size_t max_allowed = kSentinel.size() - 1;
+    SentinelScanner scanner(Sentinel_Test_Value);
+    std::size_t max_allowed = Sentinel_Test_Value.size() - 1;
     std::string piece = "<end_";
     for (int copy=0; copy < COPIES_NUMBER; ++copy) {
         SentinelScanner::Out out = scanner.feed(piece.substr(copy,1));
@@ -359,9 +359,9 @@ void test_11() {
     assert(result.kind == StopReason::Kind::Sentinel);
     assert(result.detail == "stop sentinel after 2 turns");
     assert(harness.conversation().size() == 4);
-    assert(harness.conversation().at(3).content() == "Goodbye." + kSentinel);
+    assert(harness.conversation().at(3).content() == "Goodbye." + Sentinel_Test_Value);
     assert(output.all_text.find("Goodbye.") != std::string::npos);
-    assert(output.all_text.find(kSentinel) == std::string::npos);
+    assert(output.all_text.find(Sentinel_Test_Value) == std::string::npos);
     assert(output.all_text.find("never be used") == std::string::npos);
     std::remove(script_file.c_str());
 }
@@ -376,7 +376,7 @@ void test_12() {
     original.append(Message(Role::User, "hello"));
     original.append(Message(Role::Assistant, "Hi! What can I do for you today?"));
     original.append(Message(Role::User, "nothing, bye"));
-    original.append(Message(Role::Assistant, "Goodbye." + kSentinel));
+    original.append(Message(Role::Assistant, "Goodbye." + Sentinel_Test_Value));
     save_conversation_to_file(original, transcript_file);
 
     // Step 2: load it with ReplayModelClient.
@@ -428,7 +428,9 @@ void test_13() {
 		std::remove(script_file.c_str());
 }
 
-//test for compile
+//sorry if this was not the intended layout
+// as the orignal template said to put the tests in main
+// but this is a lot better for organization
 int main() {
     std::cout << "Running Project 2 tests..." << std::endl;
 
